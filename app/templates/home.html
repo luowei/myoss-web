@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="keywords" content="MyOSS">
+    <meta name="description" content="MyOSS">
+    <meta name="apple-mobile-web-app-capable" content="no">
+    <meta content="True" name="HandheldFriendly">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=10, user-scalable=yes">
+{#    <link rel="shortcut icon" href="{{ url_for('home')~'static/home-icon.svg' }}"/>-#}
+{#    <link rel="icon" href="{{ url_for('home')~'static/home-icon.svg' }}"/>-#}
+
+    <script src="//cdn.bootcss.com/jquery/2.2.1/jquery.min.js"></script>
+    <link href="//cdn.bootcss.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet">
+    <script src="//cdn.bootcss.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+{#    <link href="{{ url_for('home')~'static/uikit.css' }}" rel="stylesheet">-#}
+{#    <script src="{{ url_for('home')~'static/uikit.js' }}"></script>-#}
+
+    <title>资源大杂烩</title>
+
+    <style type="text/css">
+        .hover-row:hover {
+            background: #e2e2e2;
+        }
+        .item-row{
+            width: auto;
+            display: block;
+            {#min-height: 20pt;#}
+        }
+        video {
+			width:auto;!important;
+			max-width:320px;!important;
+			height:auto;!important;
+		}
+        img {
+            width:auto;!important;
+            max-width: 320px !important;
+            height: auto !important;
+        }
+    </style>
+
+    <script type="text/javascript">
+        function setCookie(bucketName, bucketValue, endPoint, endPointValue, expiredays) {
+            let exdate = new Date()
+            exdate.setDate(exdate.getDate() + expiredays)
+            expireText = (expiredays == null) ? "" : ";expires=" + exdate.toGMTString()+';'
+
+            document.cookie = bucketName + "=" + escape(bucketValue) +";"+endPoint+"="+endPointValue + expireText
+        }
+        function reloadWithCookie(bucketName, bucketValue, endPoint, endPointValue, expiredays) {
+            setCookie(bucketName, bucketValue, endPoint, endPointValue, expiredays)
+            {#location.reload()#}
+            let re = /^https?:\/\/[^/]+/i;
+            window.location.href = re.exec(window.location.href)[0] + '?'+bucketName + "=" + escape(bucketValue) +"&"+endPoint+"="+endPointValue;
+        }
+        function reloadURL(url) {
+            window.location.href = url
+        }
+        function openurl(url) {
+            window.open(url, '_blank')
+        }
+        function posturl(url,paramsJsonString) {
+            let params = JSON.parse(decodeURIComponent(paramsJsonString))
+
+            let form = $(document.createElement("form"))
+                .attr({'method':'POST', "action": url})
+                {#.attr('enctype', 'application/x-www-form-urlencoded') //: 'multipart/form-data')#}
+                {#.attr('target', '_blank')#}
+
+            $.each(params, function (key, value) {
+                $.each(value instanceof Array ? value : [value], function (i, val) {
+                    $(document.createElement("input"))
+                        .attr({"type": "hidden", "name": key, "value": val})
+                        .appendTo(form);
+                });
+            });
+
+            form.appendTo(document.body).submit();
+        }
+        function onClickWithKey(ele,key,expire,url) {
+            $.post(url, { key: key, expire: expire} ,function (data) {
+                let baseURL = (/^https?:\/\/[^/]+/i).exec(window.location.href)[0]
+
+                if(data.contentType.startsWith('audio')){   //音频
+                    let title = key.substr(key.lastIndexOf('/') + 1)
+                    let onclickURL = baseURL +'/audio'
+                    let paramsStr = encodeURIComponent(JSON.stringify({'url':data.url,'title':title}))
+                    if($(ele).parent().children('audio').length > 0){
+                        $(ele).parent().children('button').first().attr("onclick","posturl('"+onclickURL+"','"+paramsStr+"')")
+                        $(ele).parent().children('audio').first().children('source').attr('src', data.url)
+                    }else{
+                        let html = "<audio class='uk-align-left' controls preload='none'><source src='"+data.url+"'/></audio><button onclick='posturl(\""+onclickURL+"\",\""+paramsStr+"\")' class='item-row btn btn-success'>打开</button>"
+                        $(ele).parent().prepend(html)
+                    }
+
+                }else if(data.contentType.startsWith('video')){     //视频
+                    let title = key.substr(key.lastIndexOf('/') + 1)
+                    let onclickURL = baseURL +'/video'
+                    let paramsStr = encodeURIComponent(JSON.stringify({'url':data.url,'title':title}))
+                    if($(ele).parent().children('video').length > 0){
+                        $(ele).parent().children('button').first().attr("onclick","posturl('"+onclickURL+"','"+paramsStr+"')")
+                        $(ele).parent().children('video').first().children('source').attr('src', data.url)
+                    }else{
+                        let html = "<video class='uk-align-left' controls preload='none'><source src='"+data.url+"'/></video><button onclick='posturl(\""+onclickURL+"\",\""+paramsStr+"\")' class='item-row btn btn-success'>打开</button>"
+                        $(ele).parent().prepend(html)
+                    }
+
+                }else if(data.contentType.startsWith('image')){     //图片
+                    if($(ele).parent().children('img').length > 0){
+                        $(ele).parent().children('img').first().attr('src', data.url).attr("onclick","openurl('"+data.url+"')")
+                    }else{
+                        //url = escape(data.url)
+                        let html = "<img class='img-responsive img-rounded img-left' src='"+data.url+"' onclick='openurl(\""+data.url+"\")'/>"
+                        $(ele).parent().prepend(html)
+                    }
+
+                }else{
+                    openurl(data.url)
+                }
+
+            });
+
+        }
+    </script>
+
+</head>
+<body>
+
+<div class="list-group">
+
+    <div class="list-group-item disabled text-center">
+        <h4 class="list-group-item-heading">文件浏览</h4>
+    </div>
+
+    <div class="list-group-item text-center">
+        <div class="btn-group" style="display: inline-block;">
+            <button class="btn btn-success" type="button" onclick="reloadWithCookie('bucketName','lwdemo','endPoint','oss-cn-beijing.aliyuncs.com')">lwdemo</button>
+        </div>
+
+        <div class="btn-group" style="display: inline-block;">
+            {% set bucketList = ['luoweitest','lwmedia','wodedata'] %}
+            {% for value in bucketList %}
+                <button class="btn btn-info" type="button"
+                        onclick="reloadWithCookie('bucketName','{{ value|e }}','endPoint','oss-cn-hangzhou.aliyuncs.com')">{{ value|e }}</button>
+            {% endfor %}
+        </div>
+
+    </div>
+
+    {% set parentURL = url_for('home') ~ '?path=' ~ parent -%}
+    <div class="list-group-item hover-row text-left">
+        <h4 class="item-row" onclick="reloadURL('{{ parentURL }}')">
+            <span class="item-row">..</span>
+        </h4>
+    </div>
+
+    <!--============主题============-->
+    {% set postURL = url_for('itemInfo')  -%}
+    {% for item in items -%}
+
+        {% if item.is_prefix() -%}  {# 如果是目录 #}
+            {% set dirUrl = url_for('home') ~'?path='~ (item.key|e)  -%}
+            <div class="list-group-item hover-row text-left">
+                <h4 class="item-row" onclick="reloadURL('{{ dirUrl }}')">
+                    <span class="item-row">{{ item.key|e }}</span>
+                </h4>
+            </div>
+
+        {% else -%}
+            <div class="list-group-item hover-row text-left">
+                <span class="item-row" onclick='onClickWithKey(this,"{{ item.key|e }}",30 * 60,"{{postURL}}")'>{{ item.key|e }}</span>
+            </div>
+        {% endif %}
+
+
+    {% endfor -%}
+
+    <!--==========Footer==========-->
+    <div class="list-group-item text-center">
+        <span class="item-row">2018年5月 by wodedata</span>
+    </div>
+
+
+
+</div>
+
+</body>
+</html>
