@@ -1,11 +1,11 @@
 # myoss
 ========
 
-### 运行
+### 运行  
 
 `python __init__.py`
 
-### 参考：
+### 参考：  
 
 [Flask Quickstart](http://flask.pocoo.org/docs/1.0/quickstart/#routing)
 
@@ -15,19 +15,24 @@
 
 [Ubuntu Apache Server 部署 Flask 程序](https://eliyar.biz/deploy-a-flask-application-on-an-ubuntu-apache-server/)
 
-## uWSGI启动
+## uWSGI启动  
 
-构建镜像
+构建镜像  
+```
 docker build -t myoss:v1.0 .
+```
 
-运行flask app
+运行flask app  
+```
 docker run --rm -it\
   --name my-oss \
   --network network_mynginx \
   -p 5000:5000 \
   myoss:v1.0
+```
 
-运行nginx
+运行nginx  
+```
 docker run --rm -p 80:80 \   
     --name mynginx \
     --network network_mynginx \
@@ -43,3 +48,4 @@ docker run --rm -p 80:80 \
    -v $PWD/../php:/usr/share/nginx/php \
    -v $PWD/../myflask:/usr/share/nginx/flask \
    nginx
+```
