@@ -29,6 +29,21 @@ docker run --rm -it\
   --network network_mynginx \
   -p 5000:5000 \
   myoss:v1.0
+
+docker run -d -it\         
+  --name my-oss \
+  --restart=always \
+  --network network_mynginx \
+  -p 5000:5000 \
+  myoss:v1.0
+
+docker run -d -it\         
+  --name my-oss \
+  --restart=always \
+  --network network_mynginx \
+  -P \
+  myoss:v1.0
+
 ```
 
 运行nginx  

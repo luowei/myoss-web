@@ -15,7 +15,7 @@ COPY . /myoss
 
 # 安装依赖
 RUN chmod 777 /tmp/ -R \
-    && pip3 install -r /myoss/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple 
+    && pip3 install -r /myoss/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --no-cache-dir
     # --no-cache-dir
 
 EXPOSE 9000
