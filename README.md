@@ -2,604 +2,422 @@
 
 > 基于 Flask 和阿里云 OSS SDK 开发的 Web 文件管理系统
 
-## 项目简介
+## 📖 项目简介
 
-myoss 是一个轻量级的阿里云对象存储 (OSS) Web 管理工具，提供文件浏览、预览、下载等功能。支持多 Bucket 切换、文件分类预览（图片/音频/视频）、临时 URL 签名等特性。
+myoss 是一个轻量级的阿里云对象存储 (OSS) Web 管理工具，提供文件浏览、预览、下载等功能。
 
 ### 核心功能
 
-- 📁 **文件浏览**：支持目录层级浏览，类似文件管理器的交互体验
-- 🔄 **多 Bucket 切换**：支持多个 OSS Bucket 快速切换
-- 🖼️ **媒体预览**：支持图片、音频、视频在线预览
-- 🔗 **签名 URL**：生成带过期时间的临时访问链接
-- 🐳 **Docker 部署**：支持容器化部署，配合 Nginx 反向代理
+- 📁 文件浏览：支持目录层级浏览
+- 🔄 多 Bucket 切换：支持配置多个 OSS Bucket
+- 🖼️ 媒体预览：支持图片、音频、视频在线预览
+- 🔗 签名 URL：生成带过期时间的临时访问链接
+- 🐳 Docker 部署：支持容器化部署
+- 🔐 权限控制：支持用户认证和 RBAC 权限管理
+- 📦 批量操作：支持批量删除、移动文件
+- 🔍 文件搜索：支持关键词搜索文件
+- 💾 Redis 缓存：支持文件列表缓存
+- 📊 监控告警：集成 Prometheus + Grafana
 
 ---
 
-## 模块架构设计
+## 🚀 快速开始
 
-### 系统架构图
+### 方式一：Docker 部署（推荐）
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                      Nginx (反向代理)                      │
-│                   端口：80/443                            │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│              uWSGI (应用服务器)                            │
-│              端口：5000                                   │
-│  配置：processes=CPU 核数*2, threads=CPU 核数*10           │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│              Flask 应用 (app/__init__.py)                 │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  路由层 (Routes)                                  │   │
-│  │  - / (首页/文件列表)                               │   │
-│  │  - /itemInfo (获取文件信息)                        │   │
-│  │  - /audio (音频播放)                               │   │
-│  │  - /video (视频播放)                               │   │
-│  │  - /player (媒体播放器)                            │   │
-│  └──────────────────────────────────────────────────┘   │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  业务逻辑层                                       │   │
-│  │  - MyOSS (OSS 客户端单例)                           │   │
-│  │  - currentBucket() (当前 Bucket 获取)               │   │
-│  └──────────────────────────────────────────────────┘   │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│           阿里云 OSS (对象存储服务)                        │
-│  支持 Bucket: lwdemo, luoweitest, lwmedia, wodedata      │
-│  支持区域：杭州 (oss-cn-hangzhou.aliyuncs.com)            │
-└─────────────────────────────────────────────────────────┘
+#### 1. 配置环境变量
+
+创建 `.env` 文件：
+```bash
+cat > .env << 'EOF'
+# 阿里云 OSS 配置
+OSS_ACCESS_KEY_ID=你的 AccessKeyID
+OSS_ACCESS_KEY_SECRET=你的 AccessKeySecret
+OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
+OSS_BUCKET_NAME=你的 Bucket 名称
+
+# Bucket 列表配置（可选）
+# 格式：bucket1:endpoint1,bucket2:endpoint2
+OSS_BUCKET_LIST=demo:oss-cn-hangzhou.aliyuncs.com,test:oss-cn-hangzhou.aliyuncs.com
+
+# Flask 密钥（用于会话加密）
+SECRET_KEY=你的随机密钥
+EOF
 ```
 
-### 目录结构
-
-```
-myoss/
-├── app/                          # 应用主目录
-│   ├── __init__.py               # Flask 应用入口 & 核心逻辑
-│   ├── static/                   # 静态资源 (CSS/JS/图片)
-│   └── templates/                # Jinja2 模板
-│       └── home.html             # 首页模板
-├── .venv/                        # Python 虚拟环境
-├── conf/                         # Nginx 配置 (外部)
-│   ├── conf.d/                   # Nginx 站点配置
-│   └── nginx.conf                # Nginx 主配置
-├── Dockerfile                    # 应用容器构建文件
-├── Flask-base.dockerfile         # 基础镜像构建文件
-├── flaskapp.wsgi                 # WSGI 入口配置
-├── uwsgi.ini                     # uWSGI 服务器配置
-├── requirements.txt              # Python 依赖
-└── README.md                     # 项目文档
-```
-
-### 核心模块说明
-
-#### 1. Flask 应用模块 (`app/__init__.py`)
-
-| 组件 | 说明 |
-|------|------|
-| `app` | Flask 应用实例 |
-| `MyOSS` | OSS 客户端单例类，管理 Bucket 连接 |
-| `currentBucket()` | 根据请求参数/cookie 获取当前 Bucket |
-
-#### 2. 路由模块
-
-| 路由 | 方法 | 功能 |
-|------|------|------|
-| `/` | GET/POST | 首页，显示文件列表 |
-| `/itemInfo` | POST | 获取文件签名 URL 和内容类型 |
-| `/audio` | POST | 打开音频播放器 |
-| `/video` | POST | 打开视频播放器 |
-| `/player` | GET | 媒体播放器页面 |
-
-#### 3. 前端模块 (`app/templates/home.html`)
-
-- **UI 框架**: Bootstrap 3.3.6 + jQuery 2.2.1
-- **核心功能**:
-  - Bucket 切换按钮组
-  - 文件列表展示（目录/文件区分）
-  - 文件点击预览（根据内容类型自动识别）
-  - Cookie 存储用户选择
-
----
-
-## 技术方案栈
-
-### 后端技术
-
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| Python | 3.x | 编程语言 |
-| Flask | - | Web 框架 |
-| oss2 | 2.5.0 | 阿里云 OSS SDK |
-| Werkzeug | 0.15.5 | WSGI 工具库 |
-| uWSGI | - | 应用服务器 |
-| Jinja2 | - | 模板引擎 |
-
-### 前端技术
-
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| Bootstrap | 3.3.6 | CSS 框架 |
-| jQuery | 2.2.1 | JavaScript 库 |
-| HTML5 | - | 音频/视频标签 |
-
-### 部署技术
-
-| 技术 | 用途 |
-|------|------|
-| Docker | 容器化部署 |
-| Nginx | 反向代理/静态资源服务 |
-| Alpine Linux | 基础镜像 (3.8) |
-
----
-
-
-## 部署指南
-
-### 环境要求
-
-- Python 3.6+
-- Docker 18.0+
-- Docker Compose (可选)
-- 阿里云 OSS 访问密钥 (AccessKey)
-
-### 部署方式
-
-#### 方式一：Docker 部署（推荐）
-
-##### 1. 构建基础镜像
+#### 2. 启动服务
 
 ```bash
-# 构建 Flask 基础镜像
-docker build -t myflask-base:v1.0 . -f Flask-base.dockerfile
+# 基础部署（应用 + Redis）
+docker-compose up -d
+
+# 完整部署（包含监控）
+docker-compose --profile monitoring up -d
 ```
 
-##### 2. 构建应用镜像
+#### 3. 访问应用
+
+- **MyOSS**: http://localhost:5000
+- **Grafana**: http://localhost:3000 (密码：admin)
+- **Prometheus**: http://localhost:9090
+
+### 方式二：本地部署
+
+#### 1. 环境要求
+
+- Python 3.10+
+- Redis（可选，用于缓存）
+
+#### 2. 安装依赖
 
 ```bash
-# 构建 myoss 应用镜像
-docker build -t myoss:v1.0 .
-```
+# 创建虚拟环境
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# venv\Scripts\activate  # Windows
 
-##### 3. 创建 Docker 网络
-
-```bash
-docker network create network_mynginx
-```
-
-##### 4. 启动 Flask 应用
-
-```bash
-# 开发模式（前台运行）
-docker run --rm -it \
-  --name my-oss \
-  --network network_mynginx \
-  -p 5000:5000 \
-  myoss:v1.0
-
-# 生产模式（后台运行，自动重启）
-docker run -d -it \
-  --name my-oss \
-  --restart=always \
-  --network network_mynginx \
-  -p 5000:5000 \
-  myoss:v1.0
-
-# 自动映射端口
-docker run -d -it \
-  --name my-oss \
-  --restart=always \
-  --network network_mynginx \
-  -P \
-  myoss:v1.0
-```
-
-##### 5. 启动 Nginx
-
-```bash
-docker run --rm -p 80:80 \
-    --name mynginx \
-    --network network_mynginx \
-    --hostname=wodedata.com \
-    --add-host=app.wodedata.com:127.0.0.1 \
-    --add-host=bbs.wodedata.com:127.0.0.1 \
-    --add-host=myoss.wodedata.com:127.0.0.1 \
-    -v $PWD/conf/conf.d:/etc/nginx/conf.d \
-    -v $PWD/conf/nginx.conf:/etc/nginx/nginx.conf \
-    -v $PWD/log:/var/log/nginx \
-    -v $PWD/www:/usr/share/nginx \
-    -v $PWD/../jekyll/_site:/usr/share/nginx/jekyll \
-    -v $PWD/../php:/usr/share/nginx/php \
-    -v $PWD/../myflask:/usr/share/nginx/flask \
-    nginx
-```
-
-#### 方式二：本地开发部署
-
-##### 1. 创建虚拟环境
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# 或
-.venv\Scripts\activate  # Windows
-```
-
-##### 2. 安装依赖
-
-```bash
+# 安装依赖
 pip install -r requirements.txt
 ```
 
-##### 3. 启动应用
+#### 3. 配置环境变量
+
+编辑 `~/.zshrc` 或 `.bash_profile`：
+```bash
+# 阿里云 OSS 配置
+export OSS_ACCESS_KEY_ID=你的 AccessKeyID
+export OSS_ACCESS_KEY_SECRET=你的 AccessKeySecret
+export OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
+export OSS_BUCKET_NAME=你的 Bucket 名称
+
+# Bucket 列表配置（可选）
+export OSS_BUCKET_LIST="demo:oss-cn-hangzhou.aliyuncs.com,test:oss-cn-beijing.aliyuncs.com"
+
+# Flask 密钥
+export SECRET_KEY=你的随机密钥
+
+# 使配置生效
+source ~/.zshrc
+```
+
+#### 4. 启动应用
 
 ```bash
-# 方式 1: 直接运行
-python app/__init__.py
+# 创建数据目录
+mkdir -p data logs
 
-# 方式 2: 使用 uWSGI
-uwsgi --ini uwsgi.ini
+# 启动应用
+python3 app/__init__.py
 
-# 方式 3: Flask 开发服务器
-export FLASK_APP=app/__init__.py
-flask run --host=0.0.0.0 --port=5000
+# 或使用 Gunicorn
+gunicorn -w 4 -b 0.0.0.0:5001 app:app
 ```
+
+#### 5. 访问应用
+
+打开浏览器访问：http://localhost:5001
 
 ---
 
-## 配置说明
-
-### 环境变量配置
-
-本项目使用环境变量管理配置，支持多种配置方式。
-
-#### 方式一：使用 .env 文件
-
-1. **复制配置模板**
-```bash
-cp .env.example .env
-```
-
-2. **编辑 `.env` 文件**，填入你的配置：
-```bash
-OSS_ACCESS_KEY_ID=your_access_key_id
-OSS_ACCESS_KEY_SECRET=your_access_key_secret
-OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
-OSS_BUCKET_NAME=your_bucket_name
-```
-
-#### 方式二：系统环境变量
-
-在 `~/.zshrc` 或 `~/.bash_profile` 中添加：
-```bash
-export OSS_ACCESS_KEY_ID="your_access_key_id"
-export OSS_ACCESS_KEY_SECRET="your_access_key_secret"
-export OSS_ENDPOINT="oss-cn-hangzhou.aliyuncs.com"
-export OSS_BUCKET_NAME="your_bucket_name"
-```
-
-#### 方式三：Docker 环境变量
-
-使用 Docker 部署时，通过 `-e` 参数传递环境变量：
-
-```bash
-docker run -d \
-  --name my-oss \
-  -e OSS_ACCESS_KEY_ID=your_key_id \
-  -e OSS_ACCESS_KEY_SECRET=your_key_secret \
-  -e OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com \
-  -e OSS_BUCKET_NAME=your_bucket \
-  -p 5000:5000 \
-  myoss:v1.0
-```
-
-#### 获取 OSS 配置
-
-1. 登录 [阿里云 OSS 控制台](https://oss.console.aliyun.com/)
-2. 获取 Bucket 的 Endpoint（区域端点）
-3. 在 [RAM 访问控制](https://ram.console.aliyun.com/manage/ak) 获取 AccessKey
-
-详细配置说明请参考 [配置更新说明](SECURITY_NOTICE.md)
-
-### uWSGI 配置 (`uwsgi.ini`)
-
-```ini
-[uwsgi]
-socket=:5000                    # 监听端口
-chmod-socket=777                # Socket 权限
-callable=app                    # Flask 应用实例名
-plugin=python3                  # Python 插件
-wsgi-file=app/__init__.py       # WSGI 入口文件
-route-run=fixpathinfo:          # 支持 Nginx location 前缀
-buffer-size=65535               # 请求缓冲区大小
-processes=%(%k * 2)             # 进程数=CPU 核数*2
-threads=%(%k * 10)              # 线程数=CPU 核数*10
-disable-logging=true            # 禁用日志
-```
-
-### Dockerfile 配置
-
-| 配置项 | 说明 |
-|--------|------|
-| 基础镜像 | `myflask-base:v1.0` (基于 Alpine 3.8) |
-| 工作目录 | `/myoss` |
-| 暴露端口 | 9000 (实际使用 5000) |
-| 启动命令 | `uwsgi --ini /myoss/uwsgi.ini` |
+## ⚙️ 配置说明
 
 ### 环境变量
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `APP_DIR` | `/myoss` | 应用目录 |
+| 变量名 | 说明 | 默认值 | 必需 |
+|--------|------|--------|------|
+| `OSS_ACCESS_KEY_ID` | 阿里云 AccessKey ID | - | ✅ |
+| `OSS_ACCESS_KEY_SECRET` | 阿里云 AccessKey Secret | - | ✅ |
+| `OSS_ENDPOINT` | OSS 区域端点 | oss-cn-hangzhou.aliyuncs.com | ✅ |
+| `OSS_BUCKET_NAME` | 默认 Bucket 名称 | lwmedia | ❌ |
+| `OSS_BUCKET_LIST` | Bucket 列表配置 | demo,test | ❌ |
+| `SECRET_KEY` | Flask 会话加密密钥 | 随机生成 | ❌ |
+| `REDIS_HOST` | Redis 主机地址 | localhost | ❌ |
+| `REDIS_PORT` | Redis 端口 | 6379 | ❌ |
+
+### Bucket 列表配置
+
+**格式**：`bucket1:endpoint1,bucket2:endpoint2`
+
+**示例**：
+```bash
+# 单区域多 Bucket
+OSS_BUCKET_LIST=demo,test,files
+
+# 多区域 Bucket
+OSS_BUCKET_LIST=beijing:oss-cn-beijing.aliyuncs.com,shanghai:oss-cn-shanghai.aliyuncs.com
+
+# 混合格式
+OSS_BUCKET_LIST=demo:oss-cn-hangzhou.aliyuncs.com,test,files:oss-cn-shanghai.aliyuncs.com
+```
+
+**默认配置**：
+```python
+[
+    {'name': 'demo', 'endpoint': 'oss-cn-hangzhou.aliyuncs.com'},
+    {'name': 'test', 'endpoint': 'oss-cn-hangzhou.aliyuncs.com'}
+]
+```
+
+### 常用 OSS Endpoint
+
+| 区域 | Endpoint |
+|------|----------|
+| 华东 1（杭州） | oss-cn-hangzhou.aliyuncs.com |
+| 华东 2（上海） | oss-cn-shanghai.aliyuncs.com |
+| 华北 2（北京） | oss-cn-beijing.aliyuncs.com |
+| 华南 1（深圳） | oss-cn-shenzhen.aliyuncs.com |
+| 香港 | oss-cn-hongkong.aliyuncs.com |
+
+完整列表：https://help.aliyun.com/document_detail/31837.html
 
 ---
 
-## 使用说明
+## 🔧 使用指南
 
-### 访问首页
+### 1. 首次使用
 
-浏览器访问：`http://localhost:5000/`
+1. **获取阿里云 AccessKey**
+   - 访问 [阿里云 RAM 控制台](https://ram.console.aliyun.com/manage/ak)
+   - 创建 AccessKey（建议使用 RAM 用户）
 
-### Bucket 切换
+2. **配置环境变量**
+   ```bash
+   export OSS_ACCESS_KEY_ID=你的 AccessKeyID
+   export OSS_ACCESS_KEY_SECRET=你的 AccessKeySecret
+   ```
 
-页面顶部提供 Bucket 切换按钮：
-- **lwdemo** (北京区域)
-- **luoweitest** (杭州区域)
-- **lwmedia** (杭州区域)
-- **wodedata** (杭州区域)
+3. **创建管理员账号**
+   - 访问 http://localhost:5001/register
+   - 注册第一个用户（默认为管理员）
 
-### 文件操作
+### 2. 文件管理
 
-| 操作 | 说明 |
-|------|------|
-| 点击目录 | 进入子目录 |
-| 点击 `..` | 返回上级目录 |
-| 点击文件 | 根据类型自动预览或下载 |
-| 图片文件 | 显示缩略图，点击打开原图 |
-| 音频文件 | 显示播放器，可在线播放 |
-| 视频文件 | 显示播放器，可在线播放 |
-| 其他文件 | 直接下载 |
+- **浏览文件**：点击目录进入，点击 `..` 返回上级
+- **预览文件**：点击文件自动识别类型并预览
+  - 图片：显示缩略图，点击打开原图
+  - 音频/视频：显示播放器
+  - 其他文件：直接下载
+- **上传文件**：点击"选择文件"按钮
+- **删除文件**：点击文件右侧删除按钮
+- **重命名**：点击文件右侧编辑按钮
+- **批量操作**：勾选文件后使用批量删除
 
-### URL 参数
+### 3. 搜索文件
 
-| 参数 | 说明 |
-|------|------|
-| `path` | 当前浏览的目录路径 |
-| `endPoint` | OSS 区域端点 |
-| `bucketName` | Bucket 名称 |
-
----
-
-## 更新日志
-
-### v3.0 (2026-03-20) - 企业级功能更新
-
-#### 🎉 新增功能
-
-1. **权限控制系统**
-   - ✨ 用户注册和登录
-   - ✨ 基于角色的访问控制 (RBAC)
-   - ✨ 三种角色：admin、editor、viewer
-   - ✨ Bucket 级别的访问权限
-   - ✨ 密码加密存储（bcrypt）
-   - ✨ 会话管理（Flask-Login）
-
-2. **批量文件操作**
-   - ✨ 批量删除文件
-   - ✨ 批量移动文件
-   - ✨ 文件选择（单选/全选）
-   - ✨ 操作确认提示
-
-3. **文件搜索**
-   - ✨ 关键词搜索
-   - ✨ 实时搜索
-   - ✨ 搜索结果高亮
-
-4. **性能缓存**
-   - ✨ Redis 缓存集成
-   - ✨ 文件列表缓存
-   - ✨ 缓存统计信息
-   - ✨ 缓存自动失效
-
-5. **监控告警**
-   - ✨ Prometheus 指标收集
-   - ✨ Grafana 可视化仪表板
-   - ✨ 请求速率监控
-   - ✨ 响应时间监控
-   - ✨ 错误率监控
-   - ✨ Node Exporter 系统监控
-
-6. **安全增强**
-   - ✨ API 限流（Flask-Limiter）
-   - ✨ CSRF 保护
-   - ✨ 密码强度检查
-   - ✨ 登录失败记录
-
-### v2.0 (2026-03-20) - 重大更新
-
-#### ✅ 已完成功能
-
-1. **前端全面升级**
-   - ✨ 升级到 Bootstrap 5.3 + Bootstrap Icons
-   - ✨ 添加文件类型图标（支持 20+ 种文件类型）
-   - ✨ 添加面包屑导航，清晰显示目录层级
-   - ✨ 现代化 UI 设计，响应式布局
-   - ✨ 文件大小和修改时间显示
-   - ✨ 操作按钮（打开、重命名、删除）
-
-2. **文件管理功能**
-   - ✨ 文件上传（支持多文件选择）
-   - ✨ 上传进度条显示
-   - ✨ 文件删除功能
-   - ✨ 文件重命名功能
-   - ✨ 操作日志记录
-
-3. **后端优化**
-   - ✨ 添加日志系统（访问日志 + 操作日志）
-   - ✨ 完善的异常处理
-   - ✨ 环境变量配置管理
-   - ✨ 移除 Python 2 兼容代码
-
-4. **Docker 优化**
-   - ✨ 多阶段构建，减小镜像体积（~150MB → ~120MB）
-   - ✨ 健康检查配置
-   - ✨ Docker Compose 支持
-   - ✨ 非 root 用户运行（安全性提升）
-   - ✨ 日志卷挂载
-
-5. **依赖升级**
-   - ✨ Flask 1.x → 3.0.0
-   - ✨ Werkzeug 0.15.5 → 3.0.1
-   - ✨ oss2 2.5.0 → 2.19.1
-   - ✨ urllib3 1.23 → 2.1.0
-   - ✨ Python 3.6 → 3.11
+在搜索框输入关键词，按回车或点击搜索按钮。
 
 ---
 
-## 技术栈总览
+## 📊 监控与日志
 
----
+### Prometheus 指标
 
-## 快速开始（5 分钟体验）
+访问 `http://localhost:5001/metrics` 查看指标：
+- `http_requests_total` - HTTP 请求总数
+- `http_request_duration_seconds` - 请求耗时
+- `oss_operations_total` - OSS 操作次数
+
+### Grafana 仪表板
+
+1. 登录 Grafana：http://localhost:3000
+2. 添加 Prometheus 数据源：http://prometheus:9090
+3. 导入仪表板配置：`monitoring/grafana-dashboard.json`
+
+### 应用日志
 
 ```bash
-# 1. 克隆项目
-git clone <repo-url>
-cd myoss
+# Docker 部署
+docker-compose logs -f myoss
 
-# 2. 构建镜像
-docker build -t myflask-base:v1.0 . -f Flask-base.dockerfile
-docker build -t myoss:v1.0 .
-
-# 3. 创建网络
-docker network create network_mynginx
-
-# 4. 启动应用
-docker run -d \
-  --name my-oss \
-  --restart=always \
-  --network network_mynginx \
-  -p 5000:5000 \
-  myoss:v1.0
-
-# 5. 访问
-open http://localhost:5000
+# 本地部署
+tail -f logs/app.log
 ```
 
 ---
 
-## 参考资源
+## 🏗️ 架构说明
 
-### 官方文档
-
-- [Flask Quickstart](http://flask.pocoo.org/docs/1.0/quickstart/#routing)
-- [Jinja Template Designer Documentation](http://jinja.pocoo.org/docs/2.10/templates/#synopsis)
-- [阿里云 OSS SDK 文档](https://help.aliyun.com/document_detail/32026.html)
-- [uWSGI 文档](https://uwsgi-docs.readthedocs.io/)
-
-### 部署教程
-
-- [How To Deploy a Flask Application on an Ubuntu VPS](https://www.digitalocean.com/community/tutorials/how-to-deploy-a-flask-application-on-an-ubuntu-vps)
-- [Ubuntu Apache Server 部署 Flask 程序](https://eliyar.biz/deploy-a-flask-application-on-an-ubuntu-apache-server/)
-
----
-
-## 技术栈总览
+### 系统架构
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    前端层                            │
-│  Bootstrap 3.3.6 + jQuery 2.2.1 + HTML5             │
-├─────────────────────────────────────────────────────┤
-│                    应用层                            │
-│  Flask + Jinja2 + Werkzeug                          │
-├─────────────────────────────────────────────────────┤
-│                   服务层                             │
-│  uWSGI (多进程 + 多线程)                              │
-├─────────────────────────────────────────────────────┤
-│                   代理层                             │
-│  Nginx (反向代理 + 负载均衡)                          │
-├─────────────────────────────────────────────────────┤
-│                   存储层                             │
-│  阿里云 OSS (对象存储)                                │
-└─────────────────────────────────────────────────────┘
+Nginx (反向代理)
+    ↓
+uWSGI (应用服务器)
+    ↓
+Flask 应用
+    ├── Redis (缓存)
+    ├── Prometheus (监控)
+    └── 阿里云 OSS (存储)
+```
+
+### 技术栈
+
+| 层级 | 技术 |
+|------|------|
+| 前端 | Bootstrap 5.3, Bootstrap Icons |
+| 后端 | Flask 3.0, Python 3.10+ |
+| 认证 | Flask-Login, bcrypt |
+| 缓存 | Redis, Flask-Caching |
+| 监控 | Prometheus, Grafana |
+| 部署 | Docker, Docker Compose |
+| 存储 | 阿里云 OSS |
+
+---
+
+## 🔐 权限管理
+
+### 用户角色
+
+| 角色 | 权限 | 说明 |
+|------|------|------|
+| **admin** | read, write, delete, upload, manage_users | 管理员，可管理用户 |
+| **editor** | read, write, upload | 编辑者，可上传修改 |
+| **viewer** | read | 查看者，只能浏览下载 |
+
+### 权限配置
+
+在 `app/auth.py` 中配置角色权限：
+```python
+ROLE_PERMISSIONS = {
+    'admin': ['read', 'write', 'delete', 'upload', 'manage_users'],
+    'editor': ['read', 'write', 'upload'],
+    'viewer': ['read']
+}
 ```
 
 ---
 
-## 变更日志
+## 📦 部署选项
 
-### v1.0 (当前版本)
-- ✅ 基础文件浏览功能
-- ✅ 多 Bucket 切换
-- ✅ 图片/音频/视频预览
-- ✅ Docker 容器化部署
-- ⚠️ 待优化项见上方"有待优化改进"章节
+### Docker Compose 服务
+
+| 服务 | 端口 | 说明 |
+|------|------|------|
+| myoss | 5000 | 应用服务 |
+| redis | 6379 | 缓存服务 |
+| prometheus | 9090 | 监控指标 |
+| grafana | 3000 | 可视化仪表板 |
+| node-exporter | 9100 | 系统指标 |
+
+### 生产环境建议
+
+1. **使用 HTTPS**
+   - 配置 Nginx 反向代理
+   - 使用 Let's Encrypt 证书
+
+2. **配置 Redis 缓存**
+   ```bash
+   export REDIS_HOST=redis-server
+   export REDIS_PORT=6379
+   ```
+
+3. **启用日志轮转**
+   ```ini
+   # uwsgi.ini
+   log-maxsize = 10485760
+   log-backupname = /var/log/myoss/app.log.bak
+   ```
+
+4. **配置监控告警**
+   - Prometheus 告警规则
+   - Grafana 告警通知
 
 ---
 
-## 许可证
+## ❓ 常见问题
+
+### 1. 无法连接 OSS
+
+**原因**：AccessKey 无效或已禁用
+
+**解决**：
+1. 登录阿里云 RAM 控制台
+2. 检查 AccessKey 状态
+3. 重新创建 AccessKey
+4. 更新环境变量配置
+
+### 2. 用户无法登录
+
+**解决**：
+```bash
+# 重置管理员密码
+python3 -c "
+from app.auth import load_users, save_users
+from werkzeug.security import generate_password_hash
+users = load_users()
+for user in users.values():
+    if user.username == 'admin':
+        user.password_hash = generate_password_hash('新密码')
+        save_users(users)
+        print('密码已重置')
+"
+```
+
+### 3. 缓存不生效
+
+**检查**：
+```bash
+# 测试 Redis 连接
+docker-compose exec redis redis-cli ping
+
+# 清除缓存
+docker-compose exec redis redis-cli FLUSHALL
+```
+
+### 4. Bucket 列表不显示
+
+**检查**：
+```bash
+# 查看环境变量
+echo $OSS_BUCKET_LIST
+
+# 验证配置
+python3 -c "from app import app; print(app.config['OSS_BUCKET_LIST'])"
+```
+
+---
+
+## 📝 更新日志
+
+### v3.0 (2026-03-20)
+
+**新增功能**：
+- ✅ 用户认证系统（登录/注册）
+- ✅ RBAC 权限管理
+- ✅ 批量文件操作
+- ✅ 文件搜索功能
+- ✅ Redis 缓存支持
+- ✅ Prometheus 监控集成
+- ✅ Grafana 可视化仪表板
+
+**优化改进**：
+- ✅ 前端升级 Bootstrap 5.3
+- ✅ 添加文件类型图标
+- ✅ 面包屑导航
+- ✅ 错误提示优化
+- ✅ 依赖版本升级
+
+### v2.0 (2026-03-20)
+
+- ✅ 文件上传功能
+- ✅ 文件删除/重命名
+- ✅ 操作日志记录
+- ✅ Docker 多阶段构建
+- ✅ 健康检查配置
+
+---
+
+## 📄 许可证
 
 本项目仅供内部使用
 
----
-
-## 联系方式
+## 📧 联系方式
 
 - **作者**: luowei
 - **邮箱**: luowei@wodedata.com
-- **项目地址**: myoss.wodedata.com
-docker build -t myoss:v1.0 .
-```
+- **项目**: https://github.com/luowei/myoss-web
 
-运行flask app  
-```
-docker run --rm -it\
-  --name my-oss \
-  --network network_mynginx \
-  -p 5000:5000 \
-  myoss:v1.0
+---
 
-docker run -d -it\         
-  --name my-oss \
-  --restart=always \
-  --network network_mynginx \
-  -p 5000:5000 \
-  myoss:v1.0
-
-docker run -d -it\         
-  --name my-oss \
-  --restart=always \
-  --network network_mynginx \
-  -P \
-  myoss:v1.0
-
-```
-
-运行nginx  
-```
-docker run --rm -p 80:80 \   
-    --name mynginx \
-    --network network_mynginx \
-    --hostname=wodedata.com \
-    --add-host=app.wodedata.com:127.0.0.1 \
-    --add-host=bbs.wodedata.com:127.0.0.1 \
-    --add-host=myoss.wodedata.com:127.0.0.1 \
-    -v $PWD/conf/conf.d:/etc/nginx/conf.d \
-    -v $PWD/conf/nginx.conf:/etc/nginx/nginx.conf \
-   -v $PWD/log:/var/log/nginx \
-   -v $PWD/www:/usr/share/nginx \
-   -v $PWD/../jekyll/_site:/usr/share/nginx/jekyll \
-   -v $PWD/../php:/usr/share/nginx/php \
-   -v $PWD/../myflask:/usr/share/nginx/flask \
-   nginx
-```
+**最后更新**: 2026-03-20  
+**版本**: v3.0
