@@ -15,13 +15,15 @@ from itertools import islice
 # from urllib.parse import urlencode
 from urllib.parse import urlencode,quote,unquote
 
-from flask import Flask, request,render_template, redirect, url_for,make_response,jsonify,Markup
+from flask import Flask, request,render_template, redirect, url_for,make_response,jsonify
+from markupsafe import Markup
 from werkzeug.utils import secure_filename
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 import logging
 from logging.handlers import RotatingFileHandler
 import time
 import os
+import secrets
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
@@ -46,7 +48,10 @@ OSS_ENDPOINT = os.environ.get('OSS_ENDPOINT', 'oss-cn-hangzhou.aliyuncs.com')
 OSS_BUCKET_NAME = os.environ.get('OSS_BUCKET_NAME', 'lwmedia')
 
 # 导入认证模块
-from .auth import load_users, permission_required, bucket_access_required, create_user, User
+try:
+    from app.auth import load_users, permission_required, bucket_access_required, create_user, User
+except ImportError:
+    from auth import load_users, permission_required, bucket_access_required, create_user, User
 
 auth = oss2.Auth(OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET)
 # bucket = oss2.Bucket(auth, 'oss-cn-beijing.aliyuncs.com', 'lwdemo')
@@ -418,6 +423,6 @@ def metrics():
     return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
 
 if __name__ == '__main__':
-    #port为端口，host值为0.0.0.0即不单单只能在127.0.0.1访问，外网也能访问
-    app.run(host='0.0.0.0',port='5000')
-    # app.run()
+    #port 为端口，host 值为 0.0.0.0 即不单单只能在 127.0.0.1 访问，外网也能访问
+    port = int(os.environ.get('PORT', 5001))
+    app.run(host='0.0.0.0', port=port, debug=False)
