@@ -1,2 +1,67 @@
-README.md
-flaskapp.wsgi
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+docker-compose.yml
+.dockerignore
+
+# 文档
+*.md
+!README.md
+LICENSE
+
+# 开发文件
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.venv/
+
+# 测试
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 日志
+logs/
+*.log
+
+# 数据
+data/
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Nginx
+conf/
+log/
+www/
+
+# 其他
+uwsgi.sock
+*.sock

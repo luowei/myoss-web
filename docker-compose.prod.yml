@@ -1,0 +1,89 @@
+# MyOSS 生产环境 Docker Compose 配置
+# 使用说明：
+#   docker-compose -f docker-compose.prod.yml up -d
+#   docker-compose -f docker-compose.prod.yml down
+
+version: '3.8'
+
+services:
+  myoss:
+    image: ghcr.io/luowei/myoss.wodedata.com:latest
+    container_name: my-oss
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - OSS_ACCESS_KEY_ID=${OSS_ACCESS_KEY_ID}
+      - OSS_ACCESS_KEY_SECRET=${OSS_ACCESS_KEY_SECRET}
+      - OSS_ENDPOINT=${OSS_ENDPOINT:-oss-cn-hangzhou.aliyuncs.com}
+      - OSS_BUCKET_NAME=${OSS_BUCKET_NAME:-lwmedia}
+      - OSS_BUCKET_LIST=${OSS_BUCKET_LIST:-demo:oss-cn-hangzhou.aliyuncs.com,test:oss-cn-hangzhou.aliyuncs.com}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SECRET_KEY=${SECRET_KEY}
+    volumes:
+      - ./logs:/var/log/myoss
+      - ./data:/myoss/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - myoss-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  redis:
+    image: redis:7-alpine
+    container_name: myoss-redis
+    restart: always
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - myoss-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: myoss-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - myoss
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - myoss-network
+
+networks:
+  myoss-network:
+    driver: bridge
+
+volumes:
+  redis-data:
