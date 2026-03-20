@@ -1,3 +1,17 @@
-oss2==2.5.0
-urllib3==1.23
-Werkzeug==0.15.5
+# MyOSS 依赖
+# 更新时间：2026-03-20
+
+# 阿里云 OSS SDK
+oss2==2.19.1
+
+# Web 框架
+Flask==3.0.0
+Werkzeug==3.0.1
+
+# HTTP 库
+urllib3==2.1.0
+requests==2.31.0
+
+# 生产部署
+uWSGI==2.0.24
+gunicorn==21.2.0

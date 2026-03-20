@@ -1,42 +1,116 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta name="keywords" content="MyOSS">
-    <meta name="description" content="MyOSS">
+    <meta name="keywords" content="MyOSS,阿里云 OSS,文件管理">
+    <meta name="description" content="MyOSS - 阿里云 OSS 文件管理工具">
     <meta name="apple-mobile-web-app-capable" content="no">
     <meta content="True" name="HandheldFriendly">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=10, user-scalable=yes">
-{#    <link rel="shortcut icon" href="{{ url_for('home')~'static/home-icon.svg' }}"/>-#}
-{#    <link rel="icon" href="{{ url_for('home')~'static/home-icon.svg' }}"/>-#}
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0,viewport-fit=cover">
 
-    <script src="//cdn.bootcss.com/jquery/2.2.1/jquery.min.js"></script>
-    <link href="//cdn.bootcss.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet">
-    <script src="//cdn.bootcss.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
-{#    <link href="{{ url_for('home')~'static/uikit.css' }}" rel="stylesheet">-#}
-{#    <script src="{{ url_for('home')~'static/uikit.js' }}"></script>-#}
+    <title>资源大杂烩 - MyOSS</title>
 
-    <title>资源大杂烩</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <style type="text/css">
-        .hover-row:hover {
-            background: #e2e2e2;
+        body {
+            background-color: #f8f9fa;
+            padding: 20px 0;
         }
-        .item-row{
-            width: auto;
-            display: block;
-            {#min-height: 20pt;#}
+        .container {
+            max-width: 1200px;
+        }
+        .file-list {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .file-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e9ecef;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .file-item:hover {
+            background-color: #f8f9fa;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .file-icon {
+            font-size: 1.2rem;
+            margin-right: 10px;
+            width: 24px;
+            text-align: center;
+        }
+        .file-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .file-size {
+            color: #6c757d;
+            font-size: 0.875rem;
+            margin-left: 10px;
+        }
+        .file-time {
+            color: #6c757d;
+            font-size: 0.875rem;
+            margin-left: 15px;
+        }
+        .breadcrumb-area {
+            background: white;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .bucket-selector {
+            background: white;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .btn-bucket {
+            margin: 2px;
+        }
+        .upload-area {
+            background: white;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .upload-progress {
+            display: none;
+            margin-top: 10px;
         }
         video {
-			width:auto;!important;
-			max-width:320px;!important;
-			height:auto;!important;
-		}
-        img {
-            width:auto;!important;
+            width: auto !important;
             max-width: 320px !important;
             height: auto !important;
+        }
+        img {
+            width: auto !important;
+            max-width: 320px !important;
+            height: auto !important;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .action-btn {
+            margin-left: 5px;
+            padding: 2px 8px;
+            font-size: 0.875rem;
+        }
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 20px;
         }
     </style>
 
@@ -45,29 +119,27 @@
             let exdate = new Date()
             exdate.setDate(exdate.getDate() + expiredays)
             expireText = (expiredays == null) ? "" : ";expires=" + exdate.toGMTString()+';'
-
             document.cookie = bucketName + "=" + escape(bucketValue) +";"+endPoint+"="+endPointValue + expireText
         }
+        
         function reloadWithCookie(bucketName, bucketValue, endPoint, endPointValue, expiredays) {
             setCookie(bucketName, bucketValue, endPoint, endPointValue, expiredays)
-            {#location.reload()#}
             let re = /^https?:\/\/[^/]+/i;
             window.location.href = re.exec(window.location.href)[0] + '?'+bucketName + "=" + escape(bucketValue) +"&"+endPoint+"="+endPointValue;
         }
+        
         function reloadURL(url) {
             window.location.href = url
         }
+        
         function openurl(url) {
             window.open(url, '_blank')
         }
+        
         function posturl(url,paramsJsonString) {
             let params = JSON.parse(decodeURIComponent(paramsJsonString))
-
             let form = $(document.createElement("form"))
                 .attr({'method':'POST', "action": url})
-                {#.attr('enctype', 'application/x-www-form-urlencoded') //: 'multipart/form-data')#}
-                {#.attr('target', '_blank')#}
-
             $.each(params, function (key, value) {
                 $.each(value instanceof Array ? value : [value], function (i, val) {
                     $(document.createElement("input"))
@@ -75,14 +147,14 @@
                         .appendTo(form);
                 });
             });
-
             form.appendTo(document.body).submit();
         }
+        
         function onClickWithKey(ele,key,expire,url) {
             $.post(url, { key: key, expire: expire} ,function (data) {
                 let baseURL = (/^https?:\/\/[^/]+/i).exec(window.location.href)[0]
 
-                if(data.contentType.startsWith('audio')){   //音频
+                if(data.contentType.startsWith('audio')){
                     let title = key.substr(key.lastIndexOf('/') + 1)
                     let onclickURL = baseURL +'/audio'
                     let paramsStr = encodeURIComponent(JSON.stringify({'url':data.url,'title':title}))
@@ -90,11 +162,10 @@
                         $(ele).parent().children('button').first().attr("onclick","posturl('"+onclickURL+"','"+paramsStr+"')")
                         $(ele).parent().children('audio').first().children('source').attr('src', data.url)
                     }else{
-                        let html = "<audio class='uk-align-left' controls preload='none'><source src='"+data.url+"'/></audio><button onclick='posturl(\""+onclickURL+"\",\""+paramsStr+"\")' class='item-row btn btn-success'>打开</button>"
+                        let html = "<audio class='mt-2' controls preload='none'><source src='"+data.url+"'/></audio>"
                         $(ele).parent().prepend(html)
                     }
-
-                }else if(data.contentType.startsWith('video')){     //视频
+                }else if(data.contentType.startsWith('video')){
                     let title = key.substr(key.lastIndexOf('/') + 1)
                     let onclickURL = baseURL +'/video'
                     let paramsStr = encodeURIComponent(JSON.stringify({'url':data.url,'title':title}))
@@ -102,87 +173,290 @@
                         $(ele).parent().children('button').first().attr("onclick","posturl('"+onclickURL+"','"+paramsStr+"')")
                         $(ele).parent().children('video').first().children('source').attr('src', data.url)
                     }else{
-                        let html = "<video class='uk-align-left' controls preload='none'><source src='"+data.url+"'/></video><button onclick='posturl(\""+onclickURL+"\",\""+paramsStr+"\")' class='item-row btn btn-success'>打开</button>"
+                        let html = "<video class='mt-2' controls preload='none'><source src='"+data.url+"'/></video>"
                         $(ele).parent().prepend(html)
                     }
-
-                }else if(data.contentType.startsWith('image')){     //图片
+                }else if(data.contentType.startsWith('image')){
                     if($(ele).parent().children('img').length > 0){
                         $(ele).parent().children('img').first().attr('src', data.url).attr("onclick","openurl('"+data.url+"')")
                     }else{
-                        //url = escape(data.url)
-                        let html = "<img class='img-responsive img-rounded img-left' src='"+data.url+"' onclick='openurl(\""+data.url+"\")'/>"
+                        let html = "<img class='mt-2' src='"+data.url+"' onclick='openurl(\""+data.url+"\")'/>"
                         $(ele).parent().prepend(html)
                     }
-
                 }else{
                     openurl(data.url)
                 }
-
             });
-
         }
+        
+        function getFileIcon(filename) {
+            let ext = filename.split('.').pop().toLowerCase();
+            let iconMap = {
+                'pdf': 'bi-file-pdf text-danger',
+                'doc': 'bi-file-word text-primary',
+                'docx': 'bi-file-word text-primary',
+                'xls': 'bi-file-excel text-success',
+                'xlsx': 'bi-file-excel text-success',
+                'ppt': 'bi-file-ppt text-warning',
+                'pptx': 'bi-file-ppt text-warning',
+                'txt': 'bi-file-text text-secondary',
+                'jpg': 'bi-file-image text-info',
+                'jpeg': 'bi-file-image text-info',
+                'png': 'bi-file-image text-info',
+                'gif': 'bi-file-image text-info',
+                'mp3': 'bi-file-music text-primary',
+                'wav': 'bi-file-music text-primary',
+                'mp4': 'bi-file-play text-danger',
+                'avi': 'bi-file-play text-danger',
+                'mov': 'bi-file-play text-danger',
+                'zip': 'bi-file-zip text-warning',
+                'rar': 'bi-file-zip text-warning',
+                '7z': 'bi-file-zip text-warning',
+                'js': 'bi-file-code text-warning',
+                'html': 'bi-file-code text-primary',
+                'css': 'bi-file-code text-info',
+                'py': 'bi-file-code text-success',
+                'json': 'bi-file-code text-secondary',
+                'xml': 'bi-file-code text-secondary'
+            };
+            let iconClass = iconMap[ext] || 'bi-file-earmark text-secondary';
+            return '<i class="bi ' + iconClass + ' file-icon"></i>';
+        }
+        
+        function formatFileSize(bytes) {
+            if (!bytes || bytes === 0) return '0 B';
+            let k = 1024;
+            let sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            let i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+        
+        function formatDate(timestamp) {
+            if (!timestamp) return '';
+            let date = new Date(timestamp);
+            return date.toLocaleString('zh-CN');
+        }
+        
+        function deleteFile(key) {
+            if(confirm('确定要删除文件 "' + key + '" 吗？此操作不可恢复！')) {
+                $.post('/delete', { key: key }, function(data) {
+                    if(data.success) {
+                        alert('删除成功');
+                        location.reload();
+                    } else {
+                        alert('删除失败：' + data.message);
+                    }
+                });
+            }
+        }
+        
+        function renameFile(key) {
+            let newName = prompt('请输入新文件名:', key.substring(key.lastIndexOf('/') + 1));
+            if(newName && newName !== key.substring(key.lastIndexOf('/') + 1)) {
+                let dir = key.substring(0, key.lastIndexOf('/') + 1);
+                let newKey = dir + newName;
+                $.post('/rename', { old_key: key, new_key: newKey }, function(data) {
+                    if(data.success) {
+                        alert('重命名成功');
+                        location.reload();
+                    } else {
+                        alert('重命名失败：' + data.message);
+                    }
+                });
+            }
+        }
+        
+        function handleFileSelect(event) {
+            let files = event.target.files;
+            if(files.length > 0) {
+                uploadFiles(files);
+            }
+        }
+        
+        function uploadFiles(files) {
+            let formData = new FormData();
+            for(let i = 0; i < files.length; i++) {
+                formData.append('file', files[i]);
+            }
+            formData.append('path', getCurrentPath());
+            
+            $('.upload-progress').show();
+            
+            $.ajax({
+                url: '/upload',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                xhr: function() {
+                    let xhr = new window.XMLHttpRequest();
+                    xhr.upload.addEventListener('progress', function(evt) {
+                        if (evt.lengthComputable) {
+                            let percent = Math.round((evt.loaded / evt.total) * 100);
+                            $('.progress-bar').width(percent + '%').text(percent + '%');
+                        }
+                    }, false);
+                    return xhr;
+                },
+                success: function(data) {
+                    if(data.success) {
+                        alert('上传成功！');
+                        location.reload();
+                    } else {
+                        alert('上传失败：' + data.message);
+                        $('.upload-progress').hide();
+                    }
+                },
+                error: function() {
+                    alert('上传失败，请重试');
+                    $('.upload-progress').hide();
+                }
+            });
+        }
+        
+        function getCurrentPath() {
+            let urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('path') || '';
+        }
+        
+        $(document).ready(function() {
+            $('[data-bs-toggle="tooltip"]').tooltip();
+        });
     </script>
 
 </head>
 <body>
 
-<div class="list-group">
-
-    <div class="list-group-item disabled text-center">
-        <h4 class="list-group-item-heading">文件浏览</h4>
+<div class="container">
+    <div class="text-center mb-4">
+        <h2><i class="bi bi-clouds"></i> 资源大杂烩</h2>
+        <p class="text-muted">阿里云 OSS 文件管理工具</p>
     </div>
 
-    <div class="list-group-item text-center">
-        <div class="btn-group" style="display: inline-block;">
-            <button class="btn btn-success" type="button" onclick="reloadWithCookie('bucketName','lwdemo','endPoint','oss-cn-beijing.aliyuncs.com')">lwdemo</button>
-        </div>
-
-        <div class="btn-group" style="display: inline-block;">
+    <!-- Bucket 选择器 -->
+    <div class="bucket-selector">
+        <div class="text-center">
+            <span class="me-2"><strong>切换 Bucket：</strong></span>
+            <button class="btn btn-success btn-sm btn-bucket" onclick="reloadWithCookie('bucketName','lwdemo','endPoint','oss-cn-beijing.aliyuncs.com')">
+                <i class="bi bi-hdd"></i> lwdemo
+            </button>
             {% set bucketList = ['luoweitest','lwmedia','wodedata'] %}
             {% for value in bucketList %}
-                <button class="btn btn-info" type="button"
-                        onclick="reloadWithCookie('bucketName','{{ value|e }}','endPoint','oss-cn-hangzhou.aliyuncs.com')">{{ value|e }}</button>
+                <button class="btn btn-primary btn-sm btn-bucket" onclick="reloadWithCookie('bucketName','{{ value|e }}','endPoint','oss-cn-hangzhou.aliyuncs.com')">
+                    <i class="bi bi-hdd"></i> {{ value|e }}
+                </button>
             {% endfor %}
         </div>
-
     </div>
 
-    {% set parentURL = url_for('home') ~ '?path=' ~ parent -%}
-    <div class="list-group-item hover-row text-left">
-        <h4 class="item-row" onclick="reloadURL('{{ parentURL }}')">
-            <span class="item-row">..</span>
-        </h4>
-    </div>
-
-    <!--============主题============-->
-    {% set postURL = url_for('itemInfo')  -%}
-    {% for item in items -%}
-
-        {% if item.is_prefix() -%}  {# 如果是目录 #}
-            {% set dirUrl = url_for('home') ~'?path='~ (item.key|e)  -%}
-            <div class="list-group-item hover-row text-left">
-                <h4 class="item-row" onclick="reloadURL('{{ dirUrl }}')">
-                    <span class="item-row">{{ item.key|e }}</span>
-                </h4>
+    <!-- 上传区域 -->
+    <div class="upload-area">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <label class="btn btn-primary btn-sm">
+                    <i class="bi bi-upload"></i> 选择文件
+                    <input type="file" id="fileInput" multiple style="display: none;" onchange="handleFileSelect(event)">
+                </label>
+                <span class="ms-2 text-muted">支持多选文件</span>
             </div>
+            <div class="upload-progress">
+                <div class="progress" style="width: 200px; display: inline-block;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        {% else -%}
-            <div class="list-group-item hover-row text-left">
-                <span class="item-row" onclick='onClickWithKey(this,"{{ item.key|e }}",30 * 60,"{{postURL}}")'>{{ item.key|e }}</span>
+    <!-- 面包屑导航 -->
+    <div class="breadcrumb-area">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item">
+                    <a href="{{ url_for('home') }}"><i class="bi bi-house"></i> 首页</a>
+                </li>
+                {% set pathParts = (path or '').split('/') | select('string') | list %}
+                {% for part in pathParts %}
+                    {% if loop.last %}
+                        <li class="breadcrumb-item active" aria-current="page">{{ part }}</li>
+                    {% else %}
+                        {% set parentPath = pathParts[:loop.index] | join('/') + '/' %}
+                        <li class="breadcrumb-item">
+                            <a href="{{ url_for('home') }}?path={{ parentPath }}">{{ part }}</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+            </ol>
+        </nav>
+    </div>
+
+    <!-- 文件列表 -->
+    <div class="file-list">
+        <!-- 返回上级目录 -->
+        {% set parentURL = url_for('home') ~ '?path=' ~ parent %}
+        <div class="file-item" onclick="reloadURL('{{ parentURL }}')">
+            <span class="file-icon"><i class="bi bi-folder2-open text-primary"></i></span>
+            <span class="file-name">..</span>
+            <span class="text-muted">返回上级</span>
+        </div>
+
+        <!-- 文件/目录列表 -->
+        {% set postURL = url_for('itemInfo') %}
+        {% for item in items %}
+            {% if item.is_prefix() %}
+                <!-- 目录 -->
+                {% set dirUrl = url_for('home') ~ '?path=' ~ (item.key|e) %}
+                <div class="file-item" onclick="reloadURL('{{ dirUrl }}')">
+                    <span class="file-icon"><i class="bi bi-folder text-primary"></i></span>
+                    <span class="file-name">{{ item.key|e }}</span>
+                    <span class="text-muted">目录</span>
+                </div>
+            {% else %}
+                <!-- 文件 -->
+                <div class="file-item">
+                    <div class="d-flex align-items-center">
+                        <span class="file-icon" onclick='onClickWithKey(this,"{{ item.key|e }}",30 * 60,"{{postURL}}")'>{{ getFileIcon(item.key) }}</span>
+                        <span class="file-name" onclick='onClickWithKey(this,"{{ item.key|e }}",30 * 60,"{{postURL}}")'>{{ item.key|e }}</span>
+                        {% if item.size %}
+                            <span class="file-size">{{ formatFileSize(item.size) }}</span>
+                        {% endif %}
+                        {% if item.last_modified %}
+                            <span class="file-time">{{ formatDate(item.last_modified) }}</span>
+                        {% endif %}
+                        <div class="ms-auto">
+                            <button class="btn btn-outline-primary btn-sm action-btn" 
+                                    onclick='onClickWithKey(this,"{{ item.key|e }}",30 * 60,"{{postURL}}")'
+                                    data-bs-toggle="tooltip" title="打开/下载">
+                                <i class="bi bi-box-arrow-in-up-right"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm action-btn" 
+                                    onclick="renameFile('{{ item.key|e }}')"
+                                    data-bs-toggle="tooltip" title="重命名">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm action-btn" 
+                                    onclick="deleteFile('{{ item.key|e }}')"
+                                    data-bs-toggle="tooltip" title="删除">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
+        
+        <!-- 空目录提示 -->
+        {% if not items %}
+            <div class="text-center text-muted py-5">
+                <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                <p class="mt-3">此目录为空</p>
             </div>
         {% endif %}
-
-
-    {% endfor -%}
-
-    <!--==========Footer==========-->
-    <div class="list-group-item text-center">
-        <span class="item-row">2018年5月 by wodedata</span>
     </div>
 
-
-
+    <!-- Footer -->
+    <div class="text-center mt-4 text-muted">
+        <p><i class="bi bi-clock"></i> 2018-2026 © wodedata.com | Powered by MyOSS</p>
+    </div>
 </div>
 
 </body>

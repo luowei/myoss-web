@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  myoss:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: myoss:v2.0
+    container_name: my-oss
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - OSS_ACCESS_KEY_ID=${OSS_ACCESS_KEY_ID:-YOUR_ACCESS_KEY_ID}
+      - OSS_ACCESS_KEY_SECRET=${OSS_ACCESS_KEY_SECRET:-YOUR_ACCESS_KEY_SECRET}
+      - OSS_ENDPOINT=${OSS_ENDPOINT:-oss-cn-hangzhou.aliyuncs.com}
+      - OSS_BUCKET_NAME=${OSS_BUCKET_NAME:-lwmedia}
+    volumes:
+      - ./logs:/var/log/myoss
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - myoss-network
+
+networks:
+  myoss-network:
+    driver: bridge
