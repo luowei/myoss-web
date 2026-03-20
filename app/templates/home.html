@@ -408,13 +408,10 @@
     <div class="bucket-selector">
         <div class="text-center">
             <span class="me-2"><strong>切换 Bucket：</strong></span>
-            <button class="btn btn-success btn-sm btn-bucket" onclick="reloadWithCookie('bucketName','lwdemo','endPoint','oss-cn-beijing.aliyuncs.com')">
-                <i class="bi bi-hdd"></i> lwdemo
-            </button>
-            {% set bucketList = ['luoweitest','lwmedia','wodedata'] %}
-            {% for value in bucketList %}
-                <button class="btn btn-primary btn-sm btn-bucket" onclick="reloadWithCookie('bucketName','{{ value|e }}','endPoint','oss-cn-hangzhou.aliyuncs.com')">
-                    <i class="bi bi-hdd"></i> {{ value|e }}
+            {% for bucket in config.OSS_BUCKET_LIST %}
+                <button class="btn btn-{{ 'success' if loop.first else 'primary' }} btn-sm btn-bucket" 
+                        onclick="reloadWithCookie('bucketName','{{ bucket.name|e }}','endPoint','{{ bucket.endpoint|e }}')">
+                    <i class="bi bi-hdd"></i> {{ bucket.name|e }}
                 </button>
             {% endfor %}
         </div>

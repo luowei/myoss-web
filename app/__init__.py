@@ -25,9 +25,39 @@ import time
 import os
 import secrets
 
+# 从环境变量读取 OSS 配置（推荐）
+# 或使用默认值（仅限开发环境）
+OSS_ACCESS_KEY_ID = os.environ.get('OSS_ACCESS_KEY_ID', 'YOUR_ACCESS_KEY_ID')
+OSS_ACCESS_KEY_SECRET = os.environ.get('OSS_ACCESS_KEY_SECRET', 'YOUR_ACCESS_KEY_SECRET')
+OSS_ENDPOINT = os.environ.get('OSS_ENDPOINT', 'oss-cn-hangzhou.aliyuncs.com')
+OSS_BUCKET_NAME = os.environ.get('OSS_BUCKET_NAME', 'lwmedia')
+
+# Bucket 列表配置（从环境变量读取，逗号分隔）
+# 格式：BUCKET_NAME1:ENDPOINT1,BUCKET_NAME2:ENDPOINT2
+# 示例：OSS_BUCKET_LIST="demo:oss-cn-hangzhou.aliyuncs.com,test:oss-cn-beijing.aliyuncs.com"
+OSS_BUCKET_LIST_RAW = os.environ.get('OSS_BUCKET_LIST', '')
+if OSS_BUCKET_LIST_RAW:
+    # 解析环境变量配置的 Bucket 列表
+    OSS_BUCKET_LIST = []
+    for item in OSS_BUCKET_LIST_RAW.split(','):
+        if ':' in item:
+            name, endpoint = item.split(':', 1)
+            OSS_BUCKET_LIST.append({'name': name.strip(), 'endpoint': endpoint.strip()})
+        else:
+            # 只有 bucket 名，使用默认 endpoint
+            OSS_BUCKET_LIST.append({'name': item.strip(), 'endpoint': OSS_ENDPOINT})
+else:
+    # 默认 Bucket 列表
+    OSS_BUCKET_LIST = [
+        {'name': 'demo', 'endpoint': 'oss-cn-hangzhou.aliyuncs.com'},
+        {'name': 'test', 'endpoint': 'oss-cn-hangzhou.aliyuncs.com'}
+    ]
+
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+app.config['OSS_BUCKET_LIST'] = OSS_BUCKET_LIST
+app.config['OSS_ENDPOINT'] = OSS_ENDPOINT
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -36,16 +66,6 @@ login_manager.login_view = 'login'
 if sys.getdefaultencoding() != 'utf-8':
     reload(sys)
     sys.setdefaultencoding('utf-8')
-
-import os
-import secrets
-
-# 从环境变量读取 OSS 配置（推荐）
-# 或使用默认值（仅限开发环境）
-OSS_ACCESS_KEY_ID = os.environ.get('OSS_ACCESS_KEY_ID', 'YOUR_ACCESS_KEY_ID')
-OSS_ACCESS_KEY_SECRET = os.environ.get('OSS_ACCESS_KEY_SECRET', 'YOUR_ACCESS_KEY_SECRET')
-OSS_ENDPOINT = os.environ.get('OSS_ENDPOINT', 'oss-cn-hangzhou.aliyuncs.com')
-OSS_BUCKET_NAME = os.environ.get('OSS_BUCKET_NAME', 'lwmedia')
 
 # 导入认证模块
 try:
