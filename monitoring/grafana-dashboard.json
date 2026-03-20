@@ -1,0 +1,50 @@
+# Grafana 仪表板配置
+# 导入 ID: 10000
+
+{
+  "dashboard": {
+    "title": "MyOSS 监控仪表板",
+    "panels": [
+      {
+        "title": "请求速率",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "{{method}} {{endpoint}}"
+          }
+        ]
+      },
+      {
+        "title": "响应时间",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "P95"
+          }
+        ]
+      },
+      {
+        "title": "错误率",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status=~\"5..\"}[5m])",
+            "legendFormat": "5xx Errors"
+          }
+        ]
+      },
+      {
+        "title": "OSS 操作统计",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(oss_operations_total)",
+            "legendFormat": "Total Operations"
+          }
+        ]
+      }
+    ]
+  }
+}

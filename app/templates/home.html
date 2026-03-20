@@ -319,8 +319,71 @@
             return urlParams.get('path') || '';
         }
         
+        let selectedFiles = [];
+        
+        function toggleSelect(key) {
+            let index = selectedFiles.indexOf(key);
+            if(index > -1) {
+                selectedFiles.splice(index, 1);
+                $(`input[data-key="${key}"]`).prop('checked', false);
+            } else {
+                selectedFiles.push(key);
+                $(`input[data-key="${key}"]`).prop('checked', true);
+            }
+            updateBatchActions();
+        }
+        
+        function selectAll() {
+            let selectAll = $('#selectAll').prop('checked');
+            selectedFiles = [];
+            $('.file-checkbox').each(function() {
+                let key = $(this).data('key');
+                $(this).prop('checked', selectAll);
+                if(selectAll) {
+                    selectedFiles.push(key);
+                }
+            });
+            updateBatchActions();
+        }
+        
+        function updateBatchActions() {
+            if(selectedFiles.length > 0) {
+                $('#batchActions').show();
+                $('#selectedCount').text(selectedFiles.length);
+            } else {
+                $('#batchActions').hide();
+            }
+        }
+        
+        function batchDelete() {
+            if(confirm(`确定要删除选中的 ${selectedFiles.length} 个文件吗？`)) {
+                $.ajax({
+                    url: '/batch_delete',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({keys: selectedFiles}),
+                    success: function(data) {
+                        if(data.success) {
+                            alert(data.message);
+                            location.reload();
+                        } else {
+                            alert('删除失败：' + data.message);
+                        }
+                    }
+                });
+            }
+        }
+        
+        function searchFiles() {
+            let keyword = $('#searchInput').val();
+            if(keyword) {
+                window.location.href = '/search?q=' + encodeURIComponent(keyword) + '&path=' + getCurrentPath();
+            }
+        }
+        
         $(document).ready(function() {
             $('[data-bs-toggle="tooltip"]').tooltip();
+            updateBatchActions();
         });
     </script>
 
@@ -349,21 +412,52 @@
         </div>
     </div>
 
-    <!-- 上传区域 -->
+    <!-- 搜索和上传区域 -->
     <div class="upload-area">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <label class="btn btn-primary btn-sm">
+        <div class="row g-3 align-items-center">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="searchInput" placeholder="搜索文件..." onkeypress="if(event.keyCode===13) searchFiles()">
+                    <button class="btn btn-outline-primary" onclick="searchFiles()">
+                        <i class="bi bi-search"></i> 搜索
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <label class="btn btn-primary btn-sm w-100">
                     <i class="bi bi-upload"></i> 选择文件
                     <input type="file" id="fileInput" multiple style="display: none;" onchange="handleFileSelect(event)">
                 </label>
-                <span class="ms-2 text-muted">支持多选文件</span>
             </div>
-            <div class="upload-progress">
-                <div class="progress" style="width: 200px; display: inline-block;">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-                </div>
+            <div class="col-md-4 text-end">
+                {% if current_user.is_authenticated %}
+                    <span class="text-muted me-2">
+                        <i class="bi bi-person-circle"></i> {{ current_user.username }} ({{ current_user.role }})
+                    </span>
+                    <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">
+                        <i class="bi bi-box-arrow-right"></i> 退出
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-box-arrow-in-right"></i> 登录
+                    </a>
+                {% endif %}
             </div>
+        </div>
+    </div>
+
+    <!-- 批量操作栏 -->
+    <div id="batchActions" class="upload-area" style="display: none;">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <span class="badge bg-primary me-2">已选择 <span id="selectedCount">0</span> 个文件</span>
+                <button class="btn btn-danger btn-sm" onclick="batchDelete()">
+                    <i class="bi bi-trash"></i> 批量删除
+                </button>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="selectedFiles = []; updateBatchActions(); $('.file-checkbox').prop('checked', false);">
+                <i class="bi bi-x-circle"></i> 取消选择
+            </button>
         </div>
     </div>
 
@@ -391,12 +485,14 @@
 
     <!-- 文件列表 -->
     <div class="file-list">
-        <!-- 返回上级目录 -->
-        {% set parentURL = url_for('home') ~ '?path=' ~ parent %}
-        <div class="file-item" onclick="reloadURL('{{ parentURL }}')">
-            <span class="file-icon"><i class="bi bi-folder2-open text-primary"></i></span>
-            <span class="file-name">..</span>
-            <span class="text-muted">返回上级</span>
+        <!-- 全选和返回上级 -->
+        <div class="file-item bg-light">
+            <div class="d-flex align-items-center">
+                <input type="checkbox" class="form-check-input me-2" id="selectAll" onclick="selectAll()">
+                <span class="file-icon"><i class="bi bi-folder2-open text-primary"></i></span>
+                <span class="file-name" style="cursor: pointer;" onclick="reloadURL('{{ parentURL }}')">..</span>
+                <span class="text-muted">返回上级</span>
+            </div>
         </div>
 
         <!-- 文件/目录列表 -->
@@ -414,6 +510,7 @@
                 <!-- 文件 -->
                 <div class="file-item">
                     <div class="d-flex align-items-center">
+                        <input type="checkbox" class="form-check-input me-2 file-checkbox" data-key="{{ item.key|e }}" onclick="event.stopPropagation(); toggleSelect('{{ item.key|e }}')">
                         <span class="file-icon" onclick='onClickWithKey(this,"{{ item.key|e }}",30 * 60,"{{postURL}}")'>{{ getFileIcon(item.key) }}</span>
                         <span class="file-name" onclick='onClickWithKey(this,"{{ item.key|e }}",30 * 60,"{{postURL}}")'>{{ item.key|e }}</span>
                         {% if item.size %}

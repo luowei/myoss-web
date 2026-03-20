@@ -1,0 +1,16 @@
+# Prometheus 监控配置
+# 更新时间：2026-03-20
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'myoss'
+    static_configs:
+      - targets: ['myoss:5000']
+    metrics_path: '/metrics'
+    
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
