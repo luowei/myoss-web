@@ -3,10 +3,19 @@ FROM python:3.11-slim as builder
 
 WORKDIR /app
 
-# 安装构建依赖
+# 安装构建依赖（包括 uWSGI 编译所需）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    python3-dev \
+    libxml2-dev \
+    libxslt1-dev \
+    zlib1g-dev \
+    libffi-dev \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# 升级 pip
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # 安装 Python 依赖
 COPY requirements.txt .
