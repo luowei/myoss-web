@@ -258,6 +258,45 @@ flask run --host=0.0.0.0 --port=5000
 
 ## 配置说明
 
+### ⚠️ 安全配置（重要）
+
+**敏感信息已移除！** 本项目现已改为使用环境变量管理敏感配置。
+
+#### 环境变量配置
+
+1. **复制配置模板**
+```bash
+cp .env.example .env
+```
+
+2. **编辑 `.env` 文件**，填入你的真实配置：
+```bash
+OSS_ACCESS_KEY_ID=your_actual_access_key_id
+OSS_ACCESS_KEY_SECRET=your_actual_access_key_secret
+OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
+OSS_BUCKET_NAME=your_bucket_name
+```
+
+3. **获取 AccessKey**
+   - 登录 [阿里云 RAM 控制台](https://ram.console.aliyun.com/manage/ak)
+   - 创建或获取 AccessKey ID 和 AccessKey Secret
+   - ⚠️ **重要**：不要将 `.env` 文件提交到 Git 仓库！
+
+#### Docker 环境变量
+
+使用 Docker 部署时，通过 `-e` 参数传递环境变量：
+
+```bash
+docker run -d \
+  --name my-oss \
+  -e OSS_ACCESS_KEY_ID=your_key_id \
+  -e OSS_ACCESS_KEY_SECRET=your_key_secret \
+  -e OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com \
+  -e OSS_BUCKET_NAME=your_bucket \
+  -p 5000:5000 \
+  myoss:v1.0
+```
+
 ### uWSGI 配置 (`uwsgi.ini`)
 
 ```ini
