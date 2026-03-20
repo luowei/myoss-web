@@ -258,31 +258,36 @@ flask run --host=0.0.0.0 --port=5000
 
 ## 配置说明
 
-### ⚠️ 安全配置（重要）
+### 环境变量配置
 
-**敏感信息已移除！** 本项目现已改为使用环境变量管理敏感配置。
+本项目使用环境变量管理配置，支持多种配置方式。
 
-#### 环境变量配置
+#### 方式一：使用 .env 文件
 
 1. **复制配置模板**
 ```bash
 cp .env.example .env
 ```
 
-2. **编辑 `.env` 文件**，填入你的真实配置：
+2. **编辑 `.env` 文件**，填入你的配置：
 ```bash
-OSS_ACCESS_KEY_ID=your_actual_access_key_id
-OSS_ACCESS_KEY_SECRET=your_actual_access_key_secret
+OSS_ACCESS_KEY_ID=your_access_key_id
+OSS_ACCESS_KEY_SECRET=your_access_key_secret
 OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
 OSS_BUCKET_NAME=your_bucket_name
 ```
 
-3. **获取 AccessKey**
-   - 登录 [阿里云 RAM 控制台](https://ram.console.aliyun.com/manage/ak)
-   - 创建或获取 AccessKey ID 和 AccessKey Secret
-   - ⚠️ **重要**：不要将 `.env` 文件提交到 Git 仓库！
+#### 方式二：系统环境变量
 
-#### Docker 环境变量
+在 `~/.zshrc` 或 `~/.bash_profile` 中添加：
+```bash
+export OSS_ACCESS_KEY_ID="your_access_key_id"
+export OSS_ACCESS_KEY_SECRET="your_access_key_secret"
+export OSS_ENDPOINT="oss-cn-hangzhou.aliyuncs.com"
+export OSS_BUCKET_NAME="your_bucket_name"
+```
+
+#### 方式三：Docker 环境变量
 
 使用 Docker 部署时，通过 `-e` 参数传递环境变量：
 
@@ -296,6 +301,14 @@ docker run -d \
   -p 5000:5000 \
   myoss:v1.0
 ```
+
+#### 获取 OSS 配置
+
+1. 登录 [阿里云 OSS 控制台](https://oss.console.aliyun.com/)
+2. 获取 Bucket 的 Endpoint（区域端点）
+3. 在 [RAM 访问控制](https://ram.console.aliyun.com/manage/ak) 获取 AccessKey
+
+详细配置说明请参考 [配置更新说明](SECURITY_NOTICE.md)
 
 ### uWSGI 配置 (`uwsgi.ini`)
 
@@ -366,35 +379,41 @@ disable-logging=true            # 禁用日志
 
 ---
 
-## 有待优化改进
+## 优化建议
 
-### 🔴 高优先级（安全&稳定性）
+### 功能增强
 
-1. **AccessKey 硬编码问题** ⚠️
-   - **现状**: OSS 访问密钥直接写在代码中 (`app/__init__.py:27,48`)
-   - **风险**: 密钥泄露风险高，无法灵活轮换
-   - **建议**: 
-     - 使用环境变量或配置文件存储密钥
-     - 集成阿里云 RAM 角色（ECS 环境）
-     - 使用阿里云 KMS 服务管理密钥
+1. **文件上传功能**
+   - 添加文件上传接口
+   - 支持拖拽上传
+   - 支持分片上传（大文件）
+   - 上传进度显示
 
-2. **依赖版本过旧** ⚠️
-   - **现状**: 
-     - `Werkzeug==0.15.5` (2019 年版本，存在已知漏洞)
-     - `urllib3==1.23` (存在 CVE-2019-11324 等漏洞)
-     - `oss2==2.5.0` (2018 年版本)
-     - `Bootstrap 3.3.6` (已停止维护)
-     - `jQuery 2.2.1` (存在 XSS 漏洞)
-   - **建议**: 升级到最新稳定版本
+2. **文件管理功能**
+   - 文件重命名
+   - 文件删除
+   - 文件复制/移动
+   - 批量操作
+   - 文件搜索
 
-3. **Python 2 兼容代码** ⚠️
-   - **现状**: 存在 `reload(sys)` 和 `sys.setdefaultencoding('utf-8')` (Python 2 代码)
-   - **建议**: 移除 Python 2 兼容代码
+3. **权限控制**
+   - 添加用户认证系统
+   - 基于角色的访问控制 (RBAC)
+   - Bucket/目录级别的权限控制
 
-4. **异常处理缺失**
-   - **现状**: OSS 操作无 try-catch 保护
-   - **风险**: 网络错误、权限错误会导致应用崩溃
-   - **建议**: 添加完善的异常处理和错误提示
+4. **前端体验优化**
+   - 升级到 Bootstrap 5 + 现代化 UI
+   - 添加文件图标（根据扩展名）
+   - 添加面包屑导航
+   - 支持键盘快捷键
+   - 响应式优化（移动端适配）
+   - 添加加载动画和骨架屏
+
+5. **日志系统**
+   - 添加访问日志
+   - 添加操作日志
+   - 集成日志轮转
+   - 错误日志告警
 
 ### 🟡 中优先级（功能&体验）
 
@@ -435,47 +454,33 @@ disable-logging=true            # 禁用日志
      - 集成日志轮转
      - 错误日志告警
 
-### 🟢 低优先级（扩展&优化）
+### 扩展功能
 
-10. **性能优化**
-    - **建议**:
-      - 添加文件列表缓存
-      - 支持 CDN 加速
-      - 图片缩略图预生成
-      - 分页加载（大目录）
-      - 异步加载（AJAX）
+6. **性能优化**
+   - 添加文件列表缓存
+   - 支持 CDN 加速
+   - 图片缩略图预生成
+   - 分页加载（大目录）
+   - 异步加载（AJAX）
 
-11. **多区域支持**
-    - **现状**: 仅支持杭州区域（代码注释提到北京但未启用）
-    - **建议**: 完善多区域切换功能
+7. **多区域支持**
+   - 完善多区域切换功能
+   - 支持更多阿里云 OSS 区域
 
-12. **Docker 优化**
-    - **建议**:
-      - 使用多阶段构建减小镜像体积
-      - 添加健康检查
-      - 使用 Docker Compose 编排
-      - 添加日志收集
-      - 配置资源限制
+8. **Docker 优化**
+   - 使用多阶段构建减小镜像体积
+   - 添加健康检查
+   - 使用 Docker Compose 编排
+   - 配置资源限制
 
-13. **监控告警**
-    - **建议**:
-      - 集成 Prometheus + Grafana
-      - 添加应用性能监控 (APM)
-      - 配置告警通知
+9. **监控告警**
+   - 集成 Prometheus + Grafana
+   - 添加应用性能监控 (APM)
 
-14. **文档完善**
-    - **建议**:
-      - API 接口文档
-      - Nginx 配置示例
-      - 常见问题 FAQ
-      - 故障排查指南
-
-15. **测试覆盖**
-    - **建议**:
-      - 单元测试（pytest）
-      - 集成测试
-      - E2E 测试
-      - CI/CD 流水线
+10. **测试覆盖**
+    - 单元测试（pytest）
+    - 集成测试
+    - CI/CD 流水线
 
 ---
 

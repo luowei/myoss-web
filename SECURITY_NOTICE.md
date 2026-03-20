@@ -1,85 +1,80 @@
-# ⚠️ 安全通告
+# 配置更新说明
 
-## 配置更新说明
+## 环境变量配置
 
-**发现时间**: 2026 年 3 月 20 日  
-**严重程度**: 🔴 高危
+**更新时间**: 2026 年 3 月 20 日
 
-### 问题描述
+### 变更内容
 
-在 Git 历史提交中发现硬编码的阿里云 OSS 凭证：
+为了更好地管理项目配置，现将所有环境相关配置改为使用环境变量方式。
 
-- **AccessKey ID**: `YOUR_ACCESS_KEY_ID`
-- **AccessKey Secret**: `YOUR_ACCESS_KEY_SECRET`
+### 配置方式
 
-### 影响范围
+#### 方式一：使用 .env 文件（推荐本地开发）
 
-- 提交历史：`b844f0a` 至 `50baf22` 之间的所有提交
-- GitHub 仓库：https://github.com/luowei/myoss-web
+1. 复制配置模板
+```bash
+cp .env.example .env
+```
 
-### 已采取的修复措施
+2. 编辑 `.env` 文件，填入你的配置：
+```bash
+OSS_ACCESS_KEY_ID=your_access_key_id
+OSS_ACCESS_KEY_SECRET=your_access_key_secret
+OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
+OSS_BUCKET_NAME=your_bucket_name
+```
 
-✅ 已移除当前代码中的硬编码凭证  
-✅ 已改用环境变量管理敏感配置  
-✅ 已添加 `.gitignore` 排除 `.env` 文件  
-✅ 已创建 `.env.example` 配置模板  
-✅ 已强制重写 Git 历史并推送到 GitHub
+#### 方式二：系统环境变量（推荐生产环境）
 
-### ⚠️ 必须立即执行的操作
+在 `~/.zshrc` 或 `~/.bash_profile` 中添加：
+```bash
+export OSS_ACCESS_KEY_ID="your_access_key_id"
+export OSS_ACCESS_KEY_SECRET="your_access_key_secret"
+export OSS_ENDPOINT="oss-cn-hangzhou.aliyuncs.com"
+export OSS_BUCKET_NAME="your_bucket_name"
+```
 
-**请立即轮换（撤销并重新生成）阿里云 AccessKey！**
+#### 方式三：Docker 环境变量
 
-#### 操作步骤：
+```bash
+docker run -d \
+  --name my-oss \
+  -e OSS_ACCESS_KEY_ID=your_key_id \
+  -e OSS_ACCESS_KEY_SECRET=your_key_secret \
+  -e OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com \
+  -e OSS_BUCKET_NAME=your_bucket \
+  -p 5000:5000 \
+  myoss:v1.0
+```
 
-1. **登录阿里云 RAM 控制台**
-   - 访问：https://ram.console.aliyun.com/manage/ak
+### 获取阿里云 OSS 配置
 
-2. **禁用泄露的 AccessKey**
-   - 找到 AccessKey ID: `YOUR_ACCESS_KEY_ID`
-   - 点击"禁用"
+1. 登录 [阿里云控制台](https://oss.console.aliyun.com/)
+2. 进入 OSS 管理控制台
+3. 在 Bucket 详情页面获取 Endpoint
+4. 在 [RAM 访问控制](https://ram.console.aliyun.com/manage/ak) 获取 AccessKey
 
-3. **删除旧密钥**
-   - 禁用后点击"删除"
+### 配置说明
 
-4. **创建新的 AccessKey**
-   - 点击"创建 AccessKey"
-   - 保存新的 AccessKey ID 和 Secret
+| 变量名 | 说明 | 示例 |
+|--------|------|------|
+| `OSS_ACCESS_KEY_ID` | 阿里云 AccessKey ID | LTAI5t... |
+| `OSS_ACCESS_KEY_SECRET` | 阿里云 AccessKey Secret | xxxxxxxxxxxxxx |
+| `OSS_ENDPOINT` | OSS 区域端点 | oss-cn-hangzhou.aliyuncs.com |
+| `OSS_BUCKET_NAME` | Bucket 名称 | my-bucket |
 
-5. **更新项目配置**
-   ```bash
-   cp .env.example .env
-   # 编辑 .env 填入新的密钥
-   ```
+### 常用 OSS 端点
 
-6. **更新部署环境**
-   - 更新服务器上的环境变量
-   - 更新 Docker 容器的环境变量
-   - 重新构建和部署
-
-### 为什么必须轮换密钥？
-
-即使我们重写了 Git 历史，以下风险仍然存在：
-
-1. **克隆过旧版本的人**：任何人在之前克隆过仓库的人都持有敏感信息
-2. **GitHub 快照**：GitHub 可能保留了历史快照
-3. **第三方工具**：CI/CD 工具、镜像服务可能已缓存旧代码
-4. **本地仓库**：所有已克隆的本地仓库仍有完整历史
-
-### 最佳实践建议
-
-1. **永远不要**将密钥硬编码到代码中
-2. **使用**环境变量或配置管理工具
-3. **启用**阿里云 RAM 角色（如果在 ECS 上部署）
-4. **定期轮换**访问密钥（建议每 90 天）
-5. **监控** AccessKey 使用情况
-6. **启用**最小权限原则
-
-### 参考资源
-
-- [阿里云 AccessKey 管理最佳实践](https://help.aliyun.com/document_detail/102600.html)
-- [Git 历史中删除敏感信息](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository)
+| 区域 | Endpoint |
+|------|----------|
+| 华东 1（杭州） | oss-cn-hangzhou.aliyuncs.com |
+| 华东 2（上海） | oss-cn-shanghai.aliyuncs.com |
+| 华北 1（青岛） | oss-cn-qingdao.aliyuncs.com |
+| 华北 2（北京） | oss-cn-beijing.aliyuncs.com |
+| 华南 1（深圳） | oss-cn-shenzhen.aliyuncs.com |
+| 香港 | oss-cn-hongkong.aliyuncs.com |
 
 ---
 
-**发布**: 2026 年 3 月 20 日  
 **更新**: 2026 年 3 月 20 日
