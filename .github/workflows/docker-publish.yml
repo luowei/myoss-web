@@ -19,7 +19,7 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write  # 创建 Release 需要写入权限
       packages: write  # 推送镜像到 GHCR 的权限
 
     steps:
