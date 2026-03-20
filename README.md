@@ -208,6 +208,226 @@ OSS_BUCKET_LIST=demo:oss-cn-hangzhou.aliyuncs.com,test,files:oss-cn-shanghai.ali
 
 ---
 
+## ⚙️ uWSGI 配置
+
+### 什么是 uWSGI
+
+uWSGI 是一个高性能的应用服务器，用于运行 Python Web 应用。本项目使用 uWSGI 作为 Flask 应用的生产级服务器。
+
+### 为什么使用 uWSGI
+
+| 特性 | 说明 |
+|------|------|
+| **高性能** | C 语言编写，性能优异 |
+| **多进程** | 支持多进程 + 多线程并发 |
+| **进程管理** | 自动管理 worker 进程 |
+| **内存控制** | 支持内存限制和请求回收 |
+| **热更新** | 支持代码热更新无需重启 |
+| **监控统计** | 内置统计和监控功能 |
+
+### 本项目配置
+
+配置文件：`uwsgi.ini`
+
+```ini
+[uwsgi]
+socket=:5000                    # 监听端口
+chmod-socket=777                # Socket 权限
+callable=app                    # Flask 应用实例名
+plugin=python3                  # Python 插件
+wsgi-file=app/__init__.py       # WSGI 入口文件
+route-run=fixpathinfo:          # 支持 Nginx location 前缀
+buffer-size=65535               # 请求缓冲区大小
+processes=%(%k * 2)             # 进程数=CPU 核数*2
+threads=%(%k * 10)              # 线程数=CPU 核数*10
+disable-logging=true            # 禁用日志
+```
+
+### 配置说明
+
+#### 1. 进程和线程
+
+```ini
+processes=%(%k * 2)    # CPU 核数 * 2
+threads=%(%k * 10)     # CPU 核数 * 10
+```
+
+**示例**：
+- 4 核 CPU：8 个进程，40 个线程
+- 8 核 CPU：16 个进程，80 个线程
+
+#### 2. 缓冲区大小
+
+```ini
+buffer-size=65535      # 64KB 缓冲区
+```
+
+用于处理大文件和长请求，本项目支持最大 500MB 文件上传。
+
+#### 3. Nginx 集成
+
+```ini
+route-run=fixpathinfo:    # 修复 PATH_INFO
+```
+
+支持 Nginx 配置 location 前缀，例如：
+```nginx
+location /myoss {
+    include uwsgi_params;
+    uwsgi_pass 127.0.0.1:5000;
+}
+```
+
+### 启动方式
+
+#### 方式一：直接启动
+```bash
+uwsgi --ini uwsgi.ini
+```
+
+#### 方式二：Docker 启动
+```bash
+docker run -d \
+  --name my-oss \
+  -p 5000:5000 \
+  myoss:v3.0
+```
+
+Dockerfile 中的启动命令：
+```dockerfile
+ENTRYPOINT ["uwsgi", "--ini", "uwsgi.ini"]
+```
+
+#### 方式三：生产环境
+```bash
+# 后台运行
+uwsgi --ini uwsgi.ini --daemonize /var/log/myoss.log
+
+# 指定配置文件
+uwsgi --ini /etc/uwsgi/myoss.ini
+```
+
+### Nginx 反向代理配置
+
+示例配置：`nginx.conf`
+
+```nginx
+server {
+    listen 80;
+    server_name myoss.example.com;
+
+    location / {
+        include uwsgi_params;
+        uwsgi_pass 127.0.0.1:5000;
+        
+        # 文件上传大小限制
+        client_max_body_size 500M;
+        
+        # 超时设置
+        uwsgi_read_timeout 300s;
+        uwsgi_send_timeout 300s;
+    }
+
+    # 静态文件（可选）
+    location /static {
+        alias /path/to/myoss/app/static;
+        expires 30d;
+    }
+}
+```
+
+### 性能优化建议
+
+#### 1. 进程数调整
+```ini
+# 根据服务器配置调整
+processes=8      # 小服务器
+processes=16     # 中等服务器
+processes=32     # 大服务器
+```
+
+#### 2. 内存限制
+```ini
+# 每个进程最大内存 512MB
+max-requests=1000
+reload-on-rss=512
+```
+
+#### 3. 请求超时
+```ini
+# 长请求支持（大文件上传）
+http-timeout=300
+socket-timeout=300
+```
+
+#### 4. 日志配置
+```ini
+# 生产环境建议
+log-maxsize=10485760        # 日志文件最大 10MB
+log-backupname=/var/log/myoss.bak
+disable-logging=true        # 禁用请求日志
+log-4xx=true                # 记录 4xx 错误
+log-5xx=true                # 记录 5xx 错误
+```
+
+### 监控和管理
+
+#### 1. 查看运行状态
+```bash
+# 查看进程
+ps aux | grep uwsgi
+
+# 查看端口
+netstat -tlnp | grep 5000
+```
+
+#### 2. 优雅重启
+```bash
+# 发送 HUP 信号
+kill -HUP $(cat /tmp/uwsgi.pid)
+
+# 或使用 touch 方式
+touch /tmp/uwsgi.reload
+```
+
+#### 3. 停止服务
+```bash
+# 优雅停止
+kill -QUIT $(cat /tmp/uwsgi.pid)
+
+# 强制停止
+kill -9 $(cat /tmp/uwsgi.pid)
+```
+
+### 故障排查
+
+#### 问题 1: 无法启动
+```bash
+# 检查端口占用
+lsof -i :5000
+
+# 检查配置文件
+uwsgi --ini uwsgi.ini --check-config
+```
+
+#### 问题 2: 进程频繁重启
+```bash
+# 查看日志
+tail -f /var/log/myoss.log
+
+# 检查内存使用
+ps aux | grep uwsgi
+```
+
+#### 问题 3: 请求超时
+```ini
+# 增加超时时间
+http-timeout=600
+socket-timeout=600
+```
+
+---
+
 ## 📊 监控与日志
 
 ### Prometheus 指标
