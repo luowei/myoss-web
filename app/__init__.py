@@ -79,13 +79,16 @@ class MyOSS(Singleton):
         self.bucketName = bucketName
         self._bucket = None
 
-    def bucket(self,endPoint=endPoints['杭州'],bucketName='lwmedia'):
-        if self._bucket == None:
-            self._bucket = oss2.Bucket(auth, self.endPoint, self.bucketName)
-        elif (endPoint not in self._bucket.endpoint) or (bucketName not in self._bucket.bucket_name):
-            self.endPoint = endPoint
-            self.bucketName = bucketName
-            self._bucket = oss2.Bucket(auth, self.endPoint, self.bucketName)
+    def bucket(self, endPoint=None, bucketName=None):
+        if endPoint is None:
+            endPoint = self.endPoint
+        if bucketName is None:
+            bucketName = self.bucketName
+            
+        if self._bucket is None:
+            self._bucket = oss2.Bucket(auth, endPoint, bucketName)
+        elif endPoint != self._bucket.endpoint or bucketName != self._bucket.bucket_name:
+            self._bucket = oss2.Bucket(auth, endPoint, bucketName)
         return self._bucket
 
 
@@ -125,39 +128,41 @@ def currentBucket():
 
 @app.route('/',methods=['GET', 'POST'])
 def home():
+    try:
+        bucket = currentBucket()
 
-    # 获取bucket列表
-    # service = oss2.Service(auth, endPoint)
-    # bucketList = [b.name for b in oss2.BucketIterator(service)]
+        path = request.args.get('path', '')
+        if path and not path.endswith('/'):
+            path += '/'
+        
+        items = []
+        try:
+            for item in oss2.ObjectIterator(bucket, prefix=path, delimiter='/'):
+                if item.key not in (path, 'oss-accesslog/'):
+                    items.append(item)
+        except Exception as e:
+            logger.error(f"列出文件失败：{e}")
+            error_message = f"无法连接 OSS: {str(e)}"
+            return render_template('home.html', error=error_message, items=[], parent='', bucket=None)
 
-    bucket = currentBucket()
+        # 父级目录
+        pItems = path.rsplit('/')
+        res = path.rsplit('/', 1)
+        parent = res[0]+'/'
+        if len(res) <= 1 or (len(pItems) == 2 and pItems[-1] == ''):
+            parent = ''
+        elif len(pItems) > 2:
+            parent = path.rsplit('/', 2)[0] + '/'
 
-    path = request.args.get('path', '')
-    if path.endswith('/') is False  and path != '':
-        path += '/'
-    # items = list(item for item in oss2.ObjectIterator(bucket, prefix=path, delimiter='/'))
-    items = []
-    for item in oss2.ObjectIterator(bucket, prefix=path, delimiter='/'):
-        # print('====key:'+item.key)
-        if item.key not in (path,'oss-accesslog/'):
-            items.append(item)
+        resp = make_response(render_template('home.html', bucket=bucket, items=items, parent=parent))
 
-    # 父级目录
-    pItems = path.rsplit('/')
-    res = path.rsplit('/', 1)
-    parent = res[0]+'/'
-    if len(res) <= 1 or (len(pItems) == 2 and pItems[-1] == ''):
-        parent = ''
-    elif len(pItems) > 2:
-        parent = path.rsplit('/', 2)[0] + '/'
-
-    resp = make_response(render_template('home.html',bucket=bucket,items=items,parent=parent))
-
-    # 设置cookie
-    resp.set_cookie('endPoint', myoss.endPoint)
-    resp.set_cookie('bucketName', myoss.bucketName)
-    return resp
-    # return render_template('home.html', name=name)
+        # 设置 cookie
+        resp.set_cookie('endPoint', myoss.endPoint)
+        resp.set_cookie('bucketName', myoss.bucketName)
+        return resp
+    except Exception as e:
+        logger.error(f"首页访问错误：{e}")
+        return render_template('home.html', error=f"服务器错误：{str(e)}", items=[], parent='')
 
 @app.route('/itemInfo',methods=['POST'])
 def itemInfo():
